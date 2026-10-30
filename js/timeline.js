@@ -129,7 +129,24 @@ export function mountTimeline(root, ctx) {
     content.style.position = 'relative';
     content.append(playhead);
     ctx.r.playhead();
+    fitHeight();
   };
+
+  // Высота по содержимому: все дорожки видны целиком, плеер берёт остаток (не меньше 300 px).
+  // Если высоту потянули рукой — больше не трогаем.
+  let manualH = false;
+  function fitHeight() {
+    const review = root.closest('.review');
+    if (!review || manualH || innerWidth <= 900) return;
+    const last = laneEls[laneEls.length - 1];
+    const rows = last ? last.offsetTop + last.offsetHeight : 120;
+    const bar = scroller.offsetHeight - scroller.clientHeight;
+    const need = head.offsetHeight + rows + bar + 2;
+    const top = parseFloat(getComputedStyle(review).getPropertyValue('--top-h')) || 56;
+    const want = Math.round(clamp(need, 180, Math.max(180, innerHeight - top - 300)));
+    const cur = parseFloat(review.style.getPropertyValue('--tl-h')) || 0;
+    if (Math.abs(cur - want) > 1) review.style.setProperty('--tl-h', want + 'px');
+  }
 
   function placeMarkers(track, notes, lane) {
     const pts = notes.filter(n => !(n.t1 > n.t0 + 0.05)).sort((a, b) => a.t0 - b.t0);
@@ -289,6 +306,7 @@ export function mountTimeline(root, ctx) {
 
   // ——— Высота таймлайна ———
   resize.addEventListener('pointerdown', e => {
+    manualH = true;
     const review = root.closest('.review'); const sy = e.clientY, h0 = root.getBoundingClientRect().height;
     resize.setPointerCapture(e.pointerId);
     const mv = ev => review.style.setProperty('--tl-h', clamp(h0 - (ev.clientY - sy), 140, innerHeight * 0.6) + 'px');
