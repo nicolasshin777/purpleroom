@@ -1,7 +1,7 @@
 // Окно «Новая версия»: ссылка с Диска или файл с компьютера.
 import { h, fill, modal, toast, icon, esc } from './util.js';
 import { detectSource, resolveLink, registerLocalFile } from './sources.js';
-import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName } from './store.js';
+import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName, touch, commit } from './store.js';
 import * as cloud from './cloud.js';
 
 export function openAddVersion(p, { onAdded } = {}) {
@@ -73,6 +73,57 @@ export function openAddVersion(p, { onAdded } = {}) {
     onAdded?.(v);
   };
   modal({ title: nextN === 1 ? 'Добавить видео' : `Новая версия V${nextN}`, body, actions: [{ label: 'Отмена' }, { label: 'Добавить версию', primary: true, onClick: submit }] });
+}
+
+/**
+ * Заменить источник видео у существующей версии: ссылка на облако вместо файла с компьютера
+ * (или новая ссылка). Правки, таймкоды и номер версии не меняются.
+ */
+export function openRelinkVersion(p, v, { onDone } = {}) {
+  if (!can.addVersion(me())) { toast('Видео меняет монтажёр или продюсер'); return; }
+  let picked = null;
+  const urlInput = h('input.input', { type: 'url', placeholder: 'https://disk.yandex.ru/i/…  или  https://drive.google.com/file/d/…', 'aria-label': 'Ссылка на видео' });
+  const badge = h('div.hint');
+  const folderBox = h('div');
+  const status = h('div.hint', { style: { minHeight: '18px' } });
+  const update = () => {
+    const s = detectSource(urlInput.value);
+    folderBox.innerHTML = '';
+    if (!urlInput.value.trim()) { badge.textContent = 'Публичная ссылка Яндекс Диска (файл или папка), Google Диска с доступом по ссылке или прямая ссылка на mp4.'; picked = null; return; }
+    badge.innerHTML = s.type === 'invalid' ? `<span style="color:var(--danger)">${esc(s.name)}</span>` : `Источник: <b>${esc(s.name)}</b>`;
+    picked = s.type === 'invalid' ? null : { type: s.type, url: urlInput.value.trim() };
+  };
+  urlInput.addEventListener('input', update); update();
+  const body = h('div',
+    h('p.muted', { style: { margin: '0 0 12px', fontSize: '13.5px' } }, v.sourceType === 'file'
+      ? `Сейчас V${v.number} — файл с вашего компьютера${v.fileName ? ` («${v.fileName}»)` : ''}: команда его не видит. Загрузите тот же рендер в облако и вставьте ссылку — все правки останутся на своих местах.`
+      : `Новая ссылка для V${v.number}. Правки и таймкоды останутся.`),
+    h('div.field', h('label', 'Ссылка на видео в облаке'), urlInput, badge),
+    folderBox, status);
+  const submit = async () => {
+    if (!picked) { status.innerHTML = '<span style="color:var(--danger)">Вставьте ссылку на видео.</span>'; return false; }
+    try {
+      status.textContent = 'Проверяю ссылку…';
+      const r = await resolveLink(picked.url, picked.path);
+      if (r.kind === 'folder') {
+        status.textContent = '';
+        fill(folderBox, h('div.field', h('label', 'В папке несколько видео — выберите файл'),
+          h('div', { style: { display: 'grid', gap: '6px', maxHeight: '220px', overflow: 'auto' } },
+            r.items.map(it => h('button.menu-item', { style: { border: '1px solid var(--line)', background: 'var(--surface)' }, type: 'button',
+              onclick: e => { picked.path = it.path; [...folderBox.querySelectorAll('.menu-item')].forEach(b => b.style.borderColor = ''); e.currentTarget.style.borderColor = 'var(--ink)'; status.textContent = `Выбран: ${it.name}`; } },
+              h('span', { html: icon('video', 16) }), it.name, h('span.sub', it.size ? (it.size / 1048576).toFixed(0) + ' МБ' : ''))))));
+        return false;
+      }
+      for (const k of ['rawLink', 'mime', 'size', 'driveId', 'sourcePath', 'picked']) delete v[k];
+      Object.assign(v, { sourceType: r.source.type === 'hls' ? 'hls' : r.source.type, sourceUrl: picked.url, sourcePath: picked.path || r.meta.path || '', fileName: r.meta.name || v.fileName });
+      if (r.meta.driveId) v.driveId = r.meta.driveId;
+      touch(p); commit();
+      toast(`V${v.number}: видео теперь по ссылке — команда его увидит`);
+      onDone?.(v);
+    } catch (e) { status.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`; return false; }
+  };
+  modal({ title: `Ссылка на облако для V${v.number}`, body, actions: [{ label: 'Отмена' }, { label: 'Сохранить ссылку', primary: true, onClick: submit }] });
+  setTimeout(() => urlInput.focus(), 40);
 }
 
 /** Кто работает в этом браузере: выбор человека и роли */

@@ -8,7 +8,7 @@ import { playableUrl, explainMediaError, registerLocalFile, attachHls } from './
 import { shapeSvg, HATCH_DEF, hitShape, moveShape } from './shapes.js';
 import { mountTimeline } from './timeline.js';
 import { mountPanel } from './panel.js';
-import { openAddVersion, openIdentity } from './versions.js';
+import { openAddVersion, openIdentity, openRelinkVersion } from './versions.js';
 import { openExportMenu, openCompare } from './export.js';
 
 const TOOLS = [
@@ -115,6 +115,7 @@ export function mountReview(root, project, query = {}) {
         h('b.mono', `V${v.number}`), h('span', v.title || 'без названия'), h('span.sub', v.id === ctx.ver?.id ? 'открыта' : `${v.status} · ${open} откр.`));
     });
     const { pop } = popover(anchor, [h('div.menu-title', 'Версии ролика'), ...items, h('div.menu-sep'),
+      can.addVersion(ctx.u()) && ctx.ver ? h('button.menu-item', { onclick: () => { pop.close(); openRelinkVersion(ctx.p, ctx.ver, { onDone: () => { retried = null; loadVersion(); } }); }, html: icon('link', 16) + (ctx.ver.sourceType === 'file' ? `Ссылка на облако для V${ctx.ver.number}` : `Заменить ссылку V${ctx.ver.number}`) }) : null,
       can.addVersion(ctx.u()) ? h('button.menu-item', { onclick: () => { pop.close(); openAddVersion(ctx.p, { onAdded: v => switchVersion(v.id) }); }, html: icon('plus', 16) + 'Новая версия' }) : h('div.menu-title', 'Версии добавляет монтажёр')]);
   }
 
@@ -195,7 +196,10 @@ export function mountReview(root, project, query = {}) {
             h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, it.name), h('span.mono', it.size ? (it.size / 1048576).toFixed(0) + ' МБ' : ''))))));
       } else if (e.code === 'reselect') {
         const inp = h('input.sr', { type: 'file', accept: 'video/*', onchange: () => { const f = inp.files[0]; if (f) { registerLocalFile(v.id, f); loadVersion(); } } });
-        showState(h('div.box', h('p', e.message), h('label.btn', { html: icon('upload', 16) + 'Выбрать файл' }, inp)));
+        showState(h('div.box', h('p', e.message + ' Чтобы видео видела вся команда, укажите ссылку на облако.'),
+          h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' } },
+            can.addVersion(ctx.u()) ? h('button.btn', { onclick: () => openRelinkVersion(ctx.p, v, { onDone: () => { retried = null; loadVersion(); } }), html: icon('link', 16) + 'Ссылка на облако' }) : null,
+            h('label.btn', { html: icon('upload', 16) + 'Выбрать файл' }, inp))));
       } else showError(e.message);
     }
   }
@@ -213,6 +217,7 @@ export function mountReview(root, project, query = {}) {
       h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' } }, h('button.btn', { onclick: () => { retried = null; loadVersion(); } }, 'Попробовать снова'),
         ctx.ver?.sourceType === 'yandex' && ctx.ver.sourcePath ? h('button.btn', { onclick: () => { ctx.ver.sourcePath = ''; ctx.ver.fileName = ''; commit('meta'); loadVersion(); } }, 'Выбрать другое видео') : null,
         ctx.ver?.sourceUrl?.startsWith('http') ? h('a.btn', { href: ctx.ver.sourceUrl, target: '_blank', rel: 'noopener' }, 'Открыть на Диске') : null,
+        ctx.ver && can.addVersion(ctx.u()) ? h('button.btn', { onclick: () => openRelinkVersion(ctx.p, ctx.ver, { onDone: () => { retried = null; loadVersion(); } }), html: icon('link', 16) + 'Другая ссылка' }) : null,
         h('label.btn', { html: icon('upload', 16) + 'Файл с компьютера' }, h('input.sr', { type: 'file', accept: 'video/*', onchange: e => { const f = e.target.files[0]; if (f && ctx.ver) { ctx.ver.sourceType = 'file'; ctx.ver.fileName = f.name; registerLocalFile(ctx.ver.id, f); commit('meta'); loadVersion(); } } })))));
   }
 
