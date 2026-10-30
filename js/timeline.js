@@ -1,7 +1,7 @@
 // Таймлайн правок: шкала, лента кадров, звуковая волна, плотность, дорожки с маркерами.
 import { h, fill, icon, clamp, tcShort, esc, relTime, initials } from './util.js';
 import { LABELS, labelById, STATUSES, statusById, RESOLVED, userById, can, updateNote, getState, commit, roleName } from './store.js';
-import { noteThumbSvg } from './shapes.js';
+import { noteThumbSvg, hasFrame } from './shapes.js';
 
 const GUT = 112;
 const GROUPS = [
@@ -265,7 +265,7 @@ export function mountTimeline(root, ctx) {
     const u = userById(n.authorId);
     tip.innerHTML = '';
     tip.append(
-      (n.shapes.length || n.snap) ? h('div.thumb', { html: noteThumbSvg(n, ctx.aspect(), 238) }) : null,
+      (n.shapes.length || hasFrame(n)) ? h('div.thumb', { html: noteThumbSvg(n, ctx.aspect(), 238) }) : null,
       h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, h('b.mono', `#${n.seq}`), h('span.mono.muted', ctx.tc(n.t0) + (n.t1 > n.t0 ? ' → ' + ctx.tc(n.t1) : '')), h('span', { style: { marginLeft: 'auto' }, class: 'stbtn st-' + n.status }, h('span.dot'), statusById(n.status).short)),
       h('div', n.text),
       h('div.muted', { style: { fontSize: '12px' } }, `${u?.name || 'Гость'} · ${n.labels.map(l => labelById(l).name).join(', ')}`),

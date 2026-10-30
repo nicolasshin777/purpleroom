@@ -2,7 +2,7 @@
 import { h, fill, modal, toast, icon, esc } from './util.js';
 import { detectSource, resolveLink, registerLocalFile } from './sources.js';
 import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName, touch, commit, projects, importNotes, readProjectJson, authorMapFor, RESOLVED, deleteProject, exportProjectJson } from './store.js';
-import { cloudOn } from './cloud.js';
+import { cloudOn, projectForExport } from './cloud.js';
 import { tcShort, download } from './util.js';
 import * as cloud from './cloud.js';
 
@@ -176,7 +176,7 @@ export function openImportNotes(p, v, { onDone } = {}) {
 export function openDeleteProject(p, { onDone } = {}) {
   if (!can.manageProject(me())) { toast('Удалять проекты может только продюсер'); return; }
   const notes = (p.notes || []).filter(n => n.kind !== 'approval').length, vers = (p.versions || []).length;
-  const save = () => { download(`${(p.title || 'проект').replace(/[\\/:*?"<>|]+/g, ' ').trim()}.spectroptik.json`, exportProjectJson(p), 'application/json'); saved = true; toast('Копия проекта скачана'); };
+  const save = async () => { toast('Собираю копию проекта…'); const full = await projectForExport(p); download(`${(p.title || 'проект').replace(/[\\/:*?"<>|]+/g, ' ').trim()}.spectroptik.json`, exportProjectJson(full), 'application/json'); saved = true; toast('Копия проекта скачана'); };
   let saved = false;
   const body = h('div',
     h('p', { style: { margin: '0 0 10px' } }, `«${p.title}»: ${notes} ${notes % 10 === 1 && notes % 100 !== 11 ? 'правка' : 'правок'}, ${vers} ${vers === 1 ? 'версия' : 'версий'}, главы и чеклист удалятся${cloudOn ? ' у всей команды' : ''}. Отменить это нельзя.`),

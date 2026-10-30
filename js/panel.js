@@ -4,7 +4,7 @@ import {
   LABELS, labelById, STATUSES, statusById, PRIORITIES, KINDS, RESOLVED, userById, can, setStatus, updateNote, deleteNote,
   addReply, commit, touch, roleName, getState,
 } from './store.js';
-import { noteThumbSvg } from './shapes.js';
+import { noteThumbSvg, hasFrame } from './shapes.js';
 
 export function mountPanel(root, ctx) {
   const tabsEl = h('div.tabs', { role: 'tablist' });
@@ -103,7 +103,7 @@ export function mountPanel(root, ctx) {
         n.visibility === 'team' ? h('span.priv', { title: 'Видит только команда', html: icon('lock', 13) }) : null,
         h('div.grow'),
         h('span.when', relTime(n.updatedAt || n.createdAt))),
-      (n.shapes.length || n.snap) ? h('div.thumbw', { html: noteThumbSvg(n, ctx.aspect(), 192) }) : null,
+      (n.shapes.length || hasFrame(n)) ? h('div.thumbw', { html: noteThumbSvg(n, ctx.aspect(), 192) }) : null,
       editingId === n.id ? editBox(n) : h('div.txt', { html: richText(n.text) }),
       h('div.row3',
         h('span.who2', h('span.avatar.sm', { style: { '--c': u?.color || '#888' } }, initials(u?.name || 'Г')), u?.name.split(' ')[0] || 'Гость'),

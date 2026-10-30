@@ -57,10 +57,17 @@ function smoothPath(pts) {
 
 export const HATCH_DEF = `<defs><pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="rgba(255,255,255,.12)"/><line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,255,255,.55)" stroke-width="3"/></pattern></defs>`;
 
+// Кадр правки: встроенный (data:) или путь в хранилище (snapRef) — ссылку даёт общая база
+let frameResolver = null;
+export function setFrameResolver(fn) { frameResolver = fn; }
+export const frameSrc = note => note.snap || (note.snapRef && frameResolver?.(note.snapRef)) || '';
+export const hasFrame = note => !!(note.snap || note.snapRef);
+
 /** Миниатюра правки: снимок кадра (если есть) + фигуры */
 export function noteThumbSvg(note, aspect = 16 / 9, w = 160) {
   const W = w, H = Math.round(w / aspect);
-  const bg = note.snap ? `<image href="${note.snap}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+  const src = frameSrc(note);
+  const bg = src ? `<image href="${src}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
     : `<rect width="${W}" height="${H}" fill="#1c1c1c"/><path d="M0 ${H * .72}L${W * .3} ${H * .5}L${W * .55} ${H * .66}L${W} ${H * .42}" stroke="#333" fill="none"/>`;
   const shapes = (note.shapes || []).map(s => shapeSvg(s, W, H, { scale: W / 520 })).join('');
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Кадр правки #${note.seq}">${HATCH_DEF}${bg}${shapes}</svg>`;

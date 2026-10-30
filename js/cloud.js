@@ -6,6 +6,7 @@ import { CLOUD } from './config.js';
 import { getState, commit, setSyncHook } from './store.js';
 import { crm } from './data.js';
 import { h, fill, toast, logoSvg } from './util.js';
+import { setFrameResolver } from './shapes.js';
 
 export const cloudOn = !!(CLOUD.url && CLOUD.key);
 const POLL_MS = 15000;
@@ -140,6 +141,7 @@ async function enter(root) {
   loadMeta();
   await firstSync();
   ready = true;
+  setFrameResolver(frameUrl);
   setSyncHook(reason => { if (reason !== 'remote') schedulePush(); });
   setInterval(() => sync(), POLL_MS);
   addEventListener('focus', () => sync());
@@ -289,6 +291,9 @@ async function doSync(first) {
   });
   if (s.projects.length !== before) changed = true;
   if (first) s.projects.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  // 3½. Кадры, встроенные в проекты, — в хранилище (проект становится лёгким)
+  if (await externalizeFrames()) changed = true;
 
   // 4. Отправляем своё
   for (const [id, d] of localDocs()) {
@@ -450,3 +455,78 @@ export async function changePassword(password) {
 }
 export const hasBackup = () => { try { return !!localStorage.getItem(BACKUP_KEY); } catch { return false; } };
 export const backupJson = () => localStorage.getItem(BACKUP_KEY);
+
+// ——— Кадры правок в файловом хранилище ———
+// Снимок кадра хранится файлом spo-frames/<проект>/<правка>.jpg, в проекте — только путь (snapRef).
+// Пока файл не загрузился (нет связи, хранилище выключено), кадр остаётся встроенным — ничего не теряется.
+const BUCKET = 'spo-frames';
+const frames = new Map();   // путь → objectURL
+const loading = new Map();  // путь → Promise
+let framesOffUntil = 0, framesTick = 0;
+
+function frameUrl(path) {
+  const u = frames.get(path);
+  if (u) return u;
+  if (ready && !loading.has(path)) ensureFrame(path);
+  return null;
+}
+/** Загрузить кадр (один раз за сессию) — Promise с objectURL или null */
+export function ensureFrame(path) {
+  if (frames.has(path)) return Promise.resolve(frames.get(path));
+  if (loading.has(path)) return loading.get(path);
+  const pr = (async () => {
+    try {
+      const { data, error } = await db.storage.from(BUCKET).download(path);
+      if (error || !data) throw error || new Error('нет файла');
+      const u = URL.createObjectURL(data); frames.set(path, u);
+      clearTimeout(framesTick); framesTick = setTimeout(() => dispatchEvent(new CustomEvent('frames')), 150);
+      return u;
+    } catch (e) { setTimeout(() => loading.delete(path), 60000); return null; }
+  })();
+  loading.set(path, pr);
+  return pr;
+}
+
+function dataUrlToBlob(d) {
+  const [head, b64] = d.split(','), mime = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64), u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return new Blob([u], { type: mime });
+}
+const blobToDataUrl = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+
+/** Встроенные кадры → в хранилище, не больше limit за круг. true — если проекты изменились. */
+async function externalizeFrames(limit = 24) {
+  if (Date.now() < framesOffUntil) return false;
+  let n = 0, changed = false;
+  for (const p of getState().projects) for (const note of p.notes || []) {
+    if (typeof note.snap !== 'string' || !note.snap.startsWith('data:image/')) continue;
+    if (n++ >= limit) return changed;
+    const blob = dataUrlToBlob(note.snap);
+    const path = `${p.id}/${note.id}.${blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg'}`;
+    const { error } = await db.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: blob.type, cacheControl: '31536000' });
+    if (error) { framesOffUntil = Date.now() + 10 * 60000; console.warn('Кадры пока остаются в проекте:', error.message || error); return changed; }
+    frames.set(path, URL.createObjectURL(blob));
+    note.snapRef = path; delete note.snap; changed = true;
+  }
+  return changed;
+}
+
+/** Копия проекта для файла: кадры возвращаются внутрь, чтобы файл был полным */
+export async function projectForExport(p) {
+  const c = JSON.parse(JSON.stringify(p));
+  if (!cloudOn || !ready) return c;
+  for (const n of c.notes || []) {
+    if (!n.snapRef || n.snap) continue;
+    try {
+      const u = frames.get(n.snapRef) || await ensureFrame(n.snapRef);
+      if (u) { n.snap = await blobToDataUrl(await (await fetch(u)).blob()); delete n.snapRef; }
+    } catch { /* без кадра — остальное в файле есть */ }
+  }
+  return c;
+}
+/** Дождаться кадров перед печатью отчёта */
+export async function preloadFrames(notes) {
+  if (!cloudOn || !ready) return;
+  await Promise.all((notes || []).filter(n => n.snapRef && !n.snap).map(n => ensureFrame(n.snapRef)));
+}

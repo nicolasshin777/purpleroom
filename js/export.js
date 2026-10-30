@@ -3,6 +3,7 @@ import { h, fill, icon, popover, download, toast, tc, tcShort, esc, clamp } from
 import { labelById, statusById, PRIORITIES, userById, RESOLVED, exportProjectJson } from './store.js';
 import { playableUrl } from './sources.js';
 import { noteThumbSvg } from './shapes.js';
+import { projectForExport, preloadFrames } from './cloud.js';
 
 const RESOLVE_COLORS = { content: 'Red', color: 'Sand', thumb: 'Yellow', sound: 'Green', subs: 'Cyan', cut: 'Blue', titles: 'Purple', fx: 'Pink', q: 'Cream' };
 
@@ -104,11 +105,12 @@ ${markers}
   toast('FCPXML скачан. В Final Cut: Файл → Импорт → XML');
 }
 
-export function exportJson(ctx) { download(`${slug(ctx.p.title)}.spectroptik.json`, exportProjectJson(ctx.p), 'application/json'); toast('Файл проекта скачан'); }
+export async function exportJson(ctx) { toast('Собираю файл проекта…'); const full = await projectForExport(ctx.p); download(`${slug(ctx.p.title)}.spectroptik.json`, exportProjectJson(full), 'application/json'); toast('Файл проекта скачан'); }
 
-export function printReport(ctx) {
+export async function printReport(ctx) {
   const v = ctx.ver;
   const notes = notesOf(ctx, true);
+  await preloadFrames(notes);
   const rep = h('div.report',
     h('h1', ctx.p.title),
     h('div.rmeta', `Версия V${v.number}${v.title ? ' — ' + v.title : ''} · ${v.status} · длительность ${tc(ctx.dur(), ctx.fps())} · правок: ${notes.length} · ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}`),
