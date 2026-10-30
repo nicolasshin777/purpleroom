@@ -173,3 +173,14 @@ a.row-item:hover { background: rgba(0,0,0,.03); }
   .two { grid-template-columns: 1fr; }
   .rel-table .hide-sm { display: none; }
 }
+/* Телефон: разделы — внизу экрана, все видны без прокрутки полосы */
+@media (max-width: 600px) {
+  .side { position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 30; flex-direction: row; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); border-bottom: 0; background: var(--panel); overflow: visible; }
+  .side-brand, .side-who, .side .grow { display: none; }
+  .side-nav { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; gap: 0; }
+  .side-link { flex-direction: column; justify-content: center; gap: 3px; height: auto; min-height: 50px; padding: 4px 0; border-radius: var(--r-s); }
+  .side-link .lbl { font-size: 10px; line-height: 1.1; font-weight: 500; }
+  .side-link .side-badge { position: absolute; margin: -22px 0 0 26px; }
+  .side-link { position: relative; }
+  .main { padding-bottom: 96px; }
+}
