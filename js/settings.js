@@ -5,6 +5,7 @@ import { crm } from './data.js';
 import { pageHead } from './shell.js';
 import { refreshYouTube, refreshTelegram } from './analytics.js';
 import * as cloud from './cloud.js';
+import { themeChoice, setTheme } from './theme.js';
 
 export function renderSettings(root) {
   const wrap = h('div'); root.append(wrap);
@@ -17,6 +18,10 @@ export function renderSettings(root) {
     fill(wrap,
       pageHead('Настройки', cloud.cloudOn ? 'Цели канала, команда и подключения площадок. Данные — в общей базе, ключи площадок видит только продюсер.' : 'Цели канала, команда и подключения площадок. Ключи хранятся только в этом браузере.'),
       h('div.cols.c2',
+        h('section.panel-box', h('h2', 'Оформление'),
+          h('div.seg.wide', { role: 'group', 'aria-label': 'Тема' }, [['light', 'Светлая'], ['dark', 'Тёмная'], ['auto', 'Как в системе']].map(([id, name]) =>
+            h('button' + (themeChoice() === id ? '.on' : ''), { type: 'button', 'aria-pressed': String(themeChoice() === id), onclick: () => { setTheme(id); draw(); } }, name))),
+          h('p.note-line', { style: { marginTop: '8px' } }, 'Тема запоминается на этом устройстве. Быстро переключить — кнопкой с луной внизу меню.')),
         h('section.panel-box', h('h2', 'Цели на месяц'),
           h('div.two',
             h('div.field', h('label', 'Длинных выпусков'), h('input.input', { type: 'number', min: 0, value: st.goals.long, oninput: e => { st.goals.long = Math.max(0, +e.target.value || 0); commit('quiet'); } })),

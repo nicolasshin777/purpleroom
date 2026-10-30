@@ -1,5 +1,6 @@
 // Экран «Ревью»: плеер + холст правок, инструменты, транспорт, верхняя панель.
-import { h, fill, $, icon, tc, clamp, toast, modal, popover, initials, logoSvg, uid, copyText, esc } from './util.js';
+import { h, fill, $, icon, tc, clamp, toast, modal, popover, initials, logoSvg, uid, copyText, esc, themeIcons } from './util.js';
+import { toggleTheme } from './theme.js';
 import {
   getProject, me, can, commit, LABELS, labelById, RESOLVED, STAGES, VERSION_STATUSES, addNote, updateNote,
   roleName, getState, touch, ev, PRIORITIES,
@@ -104,6 +105,7 @@ export function mountReview(root, project, query = {}) {
       h('button.btn.sm.hide-sm', { onclick: e => openExportMenu(e.currentTarget, ctx), html: icon('download', 16) + 'Экспорт' }),
       h('button.btn.sm.primary', { onclick: openShare, html: icon('share', 16) + '<span class="hide-sm">Поделиться</span>' }),
       h('button.icon-btn.hide-sm', { onclick: openKeys, 'aria-label': 'Горячие клавиши', title: 'Горячие клавиши (?)', html: icon('keyboard') }),
+      h('button.icon-btn.theme-btn.hide-sm', { onclick: toggleTheme, 'aria-label': 'Переключить тему', title: 'Светлая / тёмная тема', html: themeIcons() }),
       can.manageProject(u) ? h('button.icon-btn.hide-sm', { onclick: () => openDeleteProject(ctx.p, { onDone: () => { location.hash = '#/reviews'; } }), 'aria-label': 'Удалить проект', title: 'Удалить проект', html: icon('trash') }) : null,
       h('button.who', { onclick: openIdentity, title: `${u.name} · ${roleName(u.role)} — сменить` }, h('span.avatar', { style: { '--c': u.color } }, initials(u.name)), h('span.r.hide-sm', roleName(u.role))),
     );

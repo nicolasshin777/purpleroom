@@ -47,12 +47,12 @@ export function mountTimeline(root, ctx) {
   function lanesFor(notes) {
     const g = ctx.group;
     if (g === 'label') return LABELS.map(l => ({ id: l.id, name: l.name, color: l.color, match: n => (n.labels[0] || 'q') === l.id, label: l.id }));
-    if (g === 'status') return STATUSES.map(s => ({ id: s.id, name: s.name, color: { open: '#000', progress: '#3546E0', question: '#E8A400', fixed: '#1F8F5F' }[s.id] || '#85857C', match: n => n.status === s.id }));
+    if (g === 'status') return STATUSES.map(s => ({ id: s.id, name: s.name, color: { open: 'var(--ink)', progress: '#3546E0', question: '#E8A400', fixed: '#1F8F5F' }[s.id] || '#85857C', match: n => n.status === s.id }));
     if (g === 'author') {
       const ids = [...new Set([...notes.map(n => n.authorId), ctx.u().id])];
       return ids.map(id => { const u = userById(id); return { id, name: u?.name.split(' ')[0] || 'Гость', color: u?.color || '#888', match: n => n.authorId === id, sub: u ? roleName(u.role) : '' }; });
     }
-    return [{ id: 'all', name: 'Все правки', color: '#000', match: () => true }];
+    return [{ id: 'all', name: 'Все правки', color: 'var(--ink)', match: () => true }];
   }
 
   ctx.r.timeline = () => {
@@ -179,7 +179,7 @@ export function mountTimeline(root, ctx) {
     return c.join('.');
   }
   function noteColor(n) {
-    if (ctx.group === 'status') return { open: '#000', progress: '#3546E0', question: '#E8A400', fixed: '#1F8F5F' }[n.status] || '#85857C';
+    if (ctx.group === 'status') return { open: 'var(--ink)', progress: '#3546E0', question: '#E8A400', fixed: '#1F8F5F' }[n.status] || '#85857C';
     if (ctx.group === 'author') return userById(n.authorId)?.color || '#888';
     return labelById(n.labels[0]).color;
   }
@@ -195,7 +195,7 @@ export function mountTimeline(root, ctx) {
   }
   function draftMarker() {
     const d = ctx.draft, range = d.t1 > d.t0 + 0.05;
-    const style = { '--c': d.labels[0] ? labelById(d.labels[0]).color : '#000', left: x(d.t0) + 'px' };
+    const style = { '--c': d.labels[0] ? labelById(d.labels[0]).color : 'var(--ink)', left: x(d.t0) + 'px' };
     if (range) style.width = Math.max(6, x(d.t1 - d.t0)) + 'px';
     return h('div.mk.draft.' + (range ? 'rg' : 'pt'), { style, title: 'Новая правка — черновик' }, range ? null : h('i'));
   }
@@ -318,7 +318,7 @@ export function mountTimeline(root, ctx) {
   // ——— Лента кадров (скрытый второй плеер) ———
   function drawStrip(c) {
     const g = c.getContext('2d');
-    g.fillStyle = '#DCDCD6'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--strip').trim() || '#DCDCD6'; g.fillRect(0, 0, c.width, c.height);
     if (!atlas || !atlasMeta) return;
     const { n, fw, fh, have } = atlasMeta;
     const slotW = fw * (68 / fh);

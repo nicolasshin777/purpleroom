@@ -206,6 +206,8 @@ const P = {
   send: '<path d="M3 10L17 3.5l-4 13-3.5-5z"/><path d="M9.5 11.5L17 3.5"/>',
   refresh: '<path d="M16 10a6 6 0 1 1-1.8-4.3M16 4v3.5h-3.5"/>',
   external: '<path d="M11 4h5v5M16 4l-7 7M14 11.5V16H4V6h4.5"/>',
+  sun: '<circle cx="10" cy="10" r="3.2"/><path d="M10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8M4.7 4.7l1.3 1.3M14 14l1.3 1.3M4.7 15.3L6 14M14 6l1.3-1.3"/>',
+  moon: '<path d="M15.5 12.2A6.2 6.2 0 0 1 7.8 4.5a6.2 6.2 0 1 0 7.7 7.7z"/>',
 };
 export function icon(name, size = 18) {
   return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
@@ -215,8 +217,8 @@ export function iconEl(name, size) { const s = document.createElement('span'); s
 /** Логотип: призма, раскладывающая луч в спектр */
 export function logoSvg(size = 28) {
   return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">
-    <path d="M2 16h9" stroke="#000" stroke-width="1.6"/>
-    <path d="M11 6.5L19.5 25.5H2.5z" fill="none" stroke="#000" stroke-width="1.6" stroke-linejoin="round" transform="translate(4.5 -0.5)"/>
+    <path d="M2 16h9" stroke="currentColor" stroke-width="1.6"/>
+    <path d="M11 6.5L19.5 25.5H2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" transform="translate(4.5 -0.5)"/>
     <path d="M20 15.2L31 8" stroke="#E5484D" stroke-width="1.6"/>
     <path d="M20 15.8L31 12.5" stroke="#F59E0B" stroke-width="1.6"/>
     <path d="M20 16.4L31 17" stroke="#22A06B" stroke-width="1.6"/>
@@ -224,3 +226,6 @@ export function logoSvg(size = 28) {
     <path d="M20 17.6L31 26" stroke="#8E4EC6" stroke-width="1.6"/>
   </svg>`;
 }
+
+/** Кнопка темы: луна в светлой, солнце в тёмной */
+export function themeIcons(size = 18) { return icon('moon', size).replace('class="ic"', 'class="ic ic-moon"') + icon('sun', size).replace('class="ic"', 'class="ic ic-sun"'); }

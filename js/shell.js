@@ -1,5 +1,6 @@
 // Оболочка CRM: боковое меню и область страницы. Экран ревью открывается без неё — на весь экран.
-import { h, fill, icon, logoSvg, initials } from './util.js';
+import { h, fill, icon, logoSvg, initials, themeIcons } from './util.js';
+import { toggleTheme } from './theme.js';
 import { me, roleName } from './store.js';
 import { openIdentity } from './versions.js';
 import { crm, todayStr } from './data.js';
@@ -29,8 +30,10 @@ export function mountShell(root, active) {
       h('div.side-nav', NAV.map(n => h('a.side-link' + (n.id === active ? '.on' : ''), { href: n.id === 'home' ? '#/' : `#/${n.id}`, 'aria-current': n.id === active ? 'page' : null },
         h('span', { html: icon(n.icon, 18) }), h('span.lbl', n.name), badge[n.id] ? h('span.side-badge', String(badge[n.id])) : null))),
       h('div.grow'),
-      h('button.side-who', { onclick: openIdentity, title: 'Сменить пользователя' },
-        h('span.avatar', { style: { '--c': u.color } }, initials(u.name)), h('span.lbl', h('b', u.name.split(' ')[0]), h('span', roleName(u.role)))),
+      h('div.side-tools',
+        h('button.side-who', { onclick: openIdentity, title: 'Сменить пользователя' },
+          h('span.avatar', { style: { '--c': u.color } }, initials(u.name)), h('span.lbl', h('b', u.name.split(' ')[0]), h('span', roleName(u.role)))),
+        h('button.icon-btn.theme-btn', { onclick: toggleTheme, title: 'Светлая / тёмная тема', 'aria-label': 'Переключить тему', html: themeIcons() })),
     );
   };
   draw();

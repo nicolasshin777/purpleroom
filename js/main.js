@@ -76,6 +76,7 @@ async function route() {
 }
 
 window.addEventListener('hashchange', route);
+window.addEventListener('themechange', () => current?.kind === 'review' ? current.onStore?.('prefs') : current?.refresh?.());
 window.addEventListener('store-error', e => toast(e.detail, 'error'));
 subscribe(reason => { if (current?.kind === 'page') { if (reason !== 'quiet') current.refresh?.(); } else current?.onStore?.(reason); });
 

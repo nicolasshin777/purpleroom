@@ -90,7 +90,7 @@ function projectCard(p) {
 
 function ring(done, total) {
   const r = 14, c = 2 * Math.PI * r, f = total ? done / total : 0;
-  return h('span', { html: `<svg class="ring" viewBox="0 0 34 34" aria-label="Закрыто ${done} из ${total}"><circle cx="17" cy="17" r="${r}" fill="none" stroke="#D5D5CE" stroke-width="2"/><circle cx="17" cy="17" r="${r}" fill="none" stroke="#000" stroke-width="2" stroke-dasharray="${c * f} ${c}" transform="rotate(-90 17 17)" stroke-linecap="round"/><text x="17" y="20.5" text-anchor="middle" font-family="Martian Mono, monospace" font-size="8.5" fill="#000">${total ? Math.round(f * 100) : '—'}</text></svg>` });
+  return h('span', { html: `<svg class="ring" viewBox="0 0 34 34" aria-label="Закрыто ${done} из ${total}"><circle cx="17" cy="17" r="${r}" fill="none" style="stroke: var(--line)" stroke-width="2"/><circle cx="17" cy="17" r="${r}" fill="none" style="stroke: var(--ink)" stroke-width="2" stroke-dasharray="${c * f} ${c}" transform="rotate(-90 17 17)" stroke-linecap="round"/><text x="17" y="20.5" text-anchor="middle" font-family="Martian Mono, monospace" font-size="8.5" style="fill: var(--ink)">${total ? Math.round(f * 100) : '—'}</text></svg>` });
 }
 
 /** Схематичная заглушка в духе приборной графики */

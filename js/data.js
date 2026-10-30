@@ -16,7 +16,7 @@ export const REL_STAGES = [
   { id: 'edit', name: 'Монтаж', color: '#3546E0' },
   { id: 'review', name: 'Ревью', color: '#F2711C' },
   { id: 'ready', name: 'Готов', color: '#22A06B' },
-  { id: 'published', name: 'Вышел', color: '#000000' },
+  { id: 'published', name: 'Вышел', color: 'var(--ink)' },
 ];
 export const stageById = id => REL_STAGES.find(s => s.id === id) || REL_STAGES[0];
 
