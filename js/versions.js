@@ -2,6 +2,7 @@
 import { h, fill, modal, toast, icon, esc } from './util.js';
 import { detectSource, resolveLink, registerLocalFile } from './sources.js';
 import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName } from './store.js';
+import * as cloud from './cloud.js';
 
 export function openAddVersion(p, { onAdded } = {}) {
   const u = me();
@@ -76,6 +77,7 @@ export function openAddVersion(p, { onAdded } = {}) {
 
 /** Кто работает в этом браузере: выбор человека и роли */
 export function openIdentity() {
+  if (cloud.cloudOn) return openAccount();
   const st = getState();
   const name = h('input.input', { placeholder: 'Имя и фамилия' });
   const role = h('select.select', ROLES.map(r => h('option', { value: r.id }, r.name)));
@@ -88,4 +90,22 @@ export function openIdentity() {
     h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 150px', gap: '8px', marginTop: '6px' } }, name, role),
   );
   const m = modal({ title: 'Кто вы в этом проекте?', body, actions: [{ label: 'Добавить и войти', primary: true, onClick: () => { if (!name.value.trim()) { name.focus(); return false; } addUser(name.value, role.value); toast('Участник добавлен'); } }] });
+}
+
+/** С общей базой: свой аккаунт вместо выбора «кто я» */
+function openAccount() {
+  const a = cloud.account(); if (!a) return;
+  const name = h('input.input', { value: a.name || '', placeholder: 'Имя и фамилия' });
+  const pass = h('input.input', { type: 'password', autocomplete: 'new-password', placeholder: 'новый пароль, от 8 символов' });
+  const body = h('div',
+    h('p.muted', { style: { margin: '0 0 12px', fontSize: '13.5px' } }, `${a.email} · ${roleName(a.role)}. Роль выдаёт продюсер в «Настройки → Команда».`),
+    h('div.field', h('label', 'Имя в правках'), name),
+    h('div.field', h('label', 'Сменить пароль'), pass),
+    h('button.btn.ghost.danger', { type: 'button', onclick: () => cloud.signOut() }, 'Выйти из аккаунта'));
+  modal({ title: 'Ваш аккаунт', body, actions: [{ label: 'Отмена' }, { label: 'Сохранить', primary: true, onClick: async () => {
+    try {
+      if (name.value.trim() && name.value.trim() !== a.name) await cloud.renameMe(name.value);
+      if (pass.value) { if (pass.value.length < 8) { toast('Пароль — не короче 8 символов', 'error'); return false; } await cloud.changePassword(pass.value); toast('Пароль изменён'); }
+    } catch (e) { toast(e.message, 'error'); return false; }
+  } }] });
 }

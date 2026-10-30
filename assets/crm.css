@@ -184,3 +184,16 @@ a.row-item:hover { background: rgba(0,0,0,.03); }
   .side-link { position: relative; }
   .main { padding-bottom: 96px; }
 }
+
+/* Вход в общую базу */
+.auth { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: var(--paper); }
+.auth-card { width: min(400px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-l); padding: 28px 24px 22px; display: grid; gap: 4px; }
+.auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.auth-brand b { font-size: 17px; letter-spacing: -.02em; }
+.auth-brand span { font-size: 17px; color: var(--ink-3); letter-spacing: -.02em; }
+.auth-card h1 { margin: 0; font-size: 28px; line-height: 1.05; letter-spacing: -.035em; font-weight: 600; }
+.auth-sub { margin: 6px 0 16px; color: var(--ink-3); line-height: 1.45; }
+.auth-msg { margin: 0 0 10px; min-height: 1.45em; font-size: 13px; color: var(--ink-2); }
+.auth-msg.bad { color: var(--danger); }
+.auth-go { width: 100%; justify-content: center; height: 40px; }
+.auth-alt { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }

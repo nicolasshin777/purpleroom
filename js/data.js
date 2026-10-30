@@ -1,5 +1,5 @@
 // Данные CRM канала: выпуски, задачи, настройки площадок, снимки аналитики.
-import { getState, commit, me } from './store.js';
+import { getState, commit, me, tomb } from './store.js';
 import { uid } from './util.js';
 
 export const PLATFORMS = [
@@ -70,7 +70,7 @@ export function createRelease(data = {}) {
   s.releases.unshift(r); commit(); return r;
 }
 export function updateRelease(r, patch, quiet) { Object.assign(r, patch, { updatedAt: Date.now() }); commit(quiet ? 'quiet' : 'local'); }
-export function deleteRelease(r) { const s = crm(); s.releases = s.releases.filter(x => x !== r); s.tasks.forEach(t => { if (t.releaseId === r.id) t.releaseId = ''; }); commit(); }
+export function deleteRelease(r) { const s = crm(); tomb(s, r.id); s.releases = s.releases.filter(x => x !== r); s.tasks.forEach(t => { if (t.releaseId === r.id) t.releaseId = ''; }); commit(); }
 export const releaseById = id => crm().releases.find(r => r.id === id);
 
 /** Прогресс подготовки: доля отмеченных пунктов по включённым площадкам */
@@ -96,7 +96,7 @@ export function createTask(data = {}) {
   s.tasks.push(t); commit(); return t;
 }
 export function updateTask(t, patch, quiet) { Object.assign(t, patch); commit(quiet ? 'quiet' : 'local'); }
-export function deleteTask(t) { const s = crm(); s.tasks = s.tasks.filter(x => x !== t); commit(); }
+export function deleteTask(t) { const s = crm(); tomb(s, t.id); s.tasks = s.tasks.filter(x => x !== t); commit(); }
 
 // ——— Даты ———
 export const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

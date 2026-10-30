@@ -81,7 +81,12 @@ window.addEventListener('storage', e => { if (e.key === KEY) { state = load(); e
 
 function emit(reason) { listeners.forEach(fn => fn(reason)); }
 export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
-export function commit(reason = 'local') { persist(); emit(reason); }
+// Общая база (cloud.js) узнаёт о локальных изменениях через этот хук
+let syncHook = null;
+export function setSyncHook(fn) { syncHook = fn; }
+export function commit(reason = 'local') { persist(); emit(reason); syncHook?.(reason); }
+/** Отметка об удалении: чтобы удалённое у одного не вернулось из копии другого */
+export function tomb(holder, id) { holder.tombs ||= {}; holder.tombs[id] = Date.now(); }
 export const getState = () => state;
 
 // ——— Пользователи и права ———
@@ -121,7 +126,7 @@ export function createProject({ title, deadline, template = 'youtube' }) {
   };
   state.projects.unshift(p); commit(); return p;
 }
-export function deleteProject(id) { state.projects = state.projects.filter(p => p.id !== id); commit(); }
+export function deleteProject(id) { tomb(state, id); state.projects = state.projects.filter(p => p.id !== id); commit(); }
 export function touch(p) { p.updatedAt = Date.now(); }
 
 /** Новая версия. Открытые правки прошлой версии переезжают на неё. */
@@ -164,7 +169,7 @@ export function setStatus(p, n, status) {
   const from = statusById(n.status).name, to = statusById(status).name;
   updateNote(p, n, { status }, `Статус: ${from} → ${to}`);
 }
-export function deleteNote(p, n) { p.notes = p.notes.filter(x => x !== n); touch(p); commit(); }
+export function deleteNote(p, n) { tomb(p, n.id); p.notes = p.notes.filter(x => x !== n); touch(p); commit(); }
 export function addReply(p, n, text) {
   n.replies.push({ id: uid('r_'), authorId: me().id, text, at: Date.now() });
   n.updatedAt = Date.now(); touch(p); commit();

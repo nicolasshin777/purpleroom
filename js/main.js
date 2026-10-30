@@ -6,11 +6,12 @@ import * as shapes from './shapes.js';
 import * as versions from './versions.js';
 import * as data from './data.js';
 import * as shell from './shell.js';
+import * as cloud from './cloud.js';
 
 const { getProject, subscribe } = store, { toast } = util, { mountShell } = shell, { crm } = data;
 
 // Общие модули — для частей CRM, которые лежат на соседних сайтах (review и разделы канала)
-window.SPO = { util, store, sources, shapes, versions, data, shell };
+window.SPO = { util, store, sources, shapes, versions, data, shell, cloud };
 const CDN = window.SPO_CDN;
 const scripts = {};
 const loadScript = src => scripts[src] ||= new Promise((res, rej) => {
@@ -47,6 +48,7 @@ export function go(hash) { if (location.hash !== hash) location.hash = hash; els
 
 let seq = 0;
 async function route() {
+  if (!cloud.isReady()) return;
   const my = ++seq;
   crm();
   const { parts, q } = parseHash();
@@ -76,4 +78,10 @@ async function route() {
 window.addEventListener('hashchange', route);
 window.addEventListener('store-error', e => toast(e.detail, 'error'));
 subscribe(reason => { if (current?.kind === 'page') { if (reason !== 'quiet') current.refresh?.(); } else current?.onStore?.(reason); });
-route();
+
+// С общей базой — сначала вход; без неё CRM открывается сразу, как раньше
+(async () => {
+  if (cloud.cloudOn && !(await cloud.gate(app))) return;
+  app.innerHTML = '';
+  route();
+})();
