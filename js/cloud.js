@@ -180,6 +180,8 @@ async function firstSync() {
   await fetchMembers();
   await doSync(true);
   applyUsers();
+  // правки прежнего владельца браузера (u_nik), загруженные из файлов, — на аккаунт продюсера
+  if (isProducer() && JSON.stringify(s.projects).includes('"u_nik"')) { remapUser(s, 'u_nik', user.id); commit(); }
   commit('remote');
   try { localStorage.setItem(flag, '1'); } catch { }
 }

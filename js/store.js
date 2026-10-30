@@ -176,14 +176,79 @@ export function addReply(p, n, text) {
 }
 
 export function exportProjectJson(p) { return JSON.stringify({ format: 'spectroptik/project', version: 1, project: p, users: state.users }, null, 2); }
+/**
+ * Кому принадлежат правки из чужого файла: прежний владелец браузера (u_nik) и продюсер
+ * из файла — это вы, если вы продюсер; остальные — бывшие участники (имя сохраняется).
+ */
+export function authorMapFor(users = []) {
+  const u = me(), map = {};
+  for (const x of users) {
+    if (!x?.id || x.id === u?.id) continue;
+    if (x.id === 'u_nik' || (x.role === 'producer' && u?.role === 'producer')) { map[x.id] = u.id; continue; }
+    if (!userById(x.id)) {
+      const keep = { id: x.id, name: x.name, role: x.role, color: x.color };
+      state.users.push({ ...keep, legacy: true });
+      state.legacyUsers ||= [];
+      if (!state.legacyUsers.some(l => l.id === x.id)) state.legacyUsers.push(keep);
+    }
+  }
+  if (u?.role === 'producer' && u.id !== 'u_nik') map.u_nik ||= u.id;
+  return map;
+}
+function remapAuthors(notes, map) {
+  for (const n of notes || []) {
+    if (map[n.authorId]) n.authorId = map[n.authorId];
+    for (const r of n.replies || []) if (map[r.authorId]) r.authorId = map[r.authorId];
+  }
+}
+
 export function importProjectJson(text) {
   const data = JSON.parse(text);
   if (data.format !== 'spectroptik/project') throw new Error('Это не файл проекта СпектрОптик');
-  for (const u of data.users || []) if (!userById(u.id)) state.users.push(u);
   const p = data.project;
+  remapAuthors(p.notes, authorMapFor(data.users));
   const existing = getProject(p.id);
   if (existing) Object.assign(existing, p); else state.projects.unshift(p);
   commit(); return p;
+}
+
+/** Прочитать файл проекта для переноса правок (без добавления проекта) */
+export function readProjectJson(text) {
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error('Файл не читается как JSON'); }
+  if (data.format === 'spectroptik/project') return { project: data.project, users: data.users || [] };
+  if (data.format === 'spectroptik/backup') {
+    const list = data.data?.projects || [];
+    if (!list.length) throw new Error('В копии нет проектов');
+    return { projects: list, users: data.data?.users || [] };
+  }
+  throw new Error('Это не файл проекта СпектрОптик');
+}
+
+/**
+ * Перенести правки из другого проекта в этот — на версию versionId.
+ * Уже перенесённые (тот же id) пропускаются, удалённые здесь — не возвращаются.
+ * Если в проекте ещё нет правок, номера #1, #2… сохраняются как были.
+ */
+export function importNotes(p, src, versionId, map = {}) {
+  const have = new Set(p.notes.map(n => n.id)), tombs = p.tombs || {};
+  const keepSeq = p.notes.length === 0;
+  const list = [...(src.notes || [])].filter(n => n.kind !== 'approval').sort((a, b) => (a.seq || 0) - (b.seq || 0));
+  let added = 0, skipped = 0;
+  for (const n of list) {
+    if (have.has(n.id) || tombs[n.id]) { skipped++; continue; }
+    const c = JSON.parse(JSON.stringify(n));
+    c.versionId = versionId;
+    remapAuthors([c], map);
+    if (keepSeq && c.seq) p.seq = Math.max(p.seq || 0, c.seq);
+    else { p.seq = (p.seq || p.notes.reduce((m, x) => Math.max(m, x.seq || 0), 0)) + 1; c.seq = p.seq; }
+    c.events = [...(c.events || []), ev('import', `Перенесена из «${src.title}»`)];
+    c.updatedAt = Date.now();
+    p.notes.push(c); added++;
+  }
+  if (!p.chapters?.length && src.chapters?.length) p.chapters = JSON.parse(JSON.stringify(src.chapters));
+  touch(p); commit();
+  return { added, skipped };
 }
 
 // ——— Стартовые данные: владелец и первый проект с видео из папки Яндекс Диска ———

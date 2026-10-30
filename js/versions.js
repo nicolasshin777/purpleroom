@@ -1,7 +1,8 @@
 // Окно «Новая версия»: ссылка с Диска или файл с компьютера.
 import { h, fill, modal, toast, icon, esc } from './util.js';
 import { detectSource, resolveLink, registerLocalFile } from './sources.js';
-import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName, touch, commit } from './store.js';
+import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName, touch, commit, projects, importNotes, readProjectJson, authorMapFor, RESOLVED } from './store.js';
+import { tcShort } from './util.js';
 import * as cloud from './cloud.js';
 
 export function openAddVersion(p, { onAdded } = {}) {
@@ -124,6 +125,50 @@ export function openRelinkVersion(p, v, { onDone } = {}) {
   };
   modal({ title: `Ссылка на облако для V${v.number}`, body, actions: [{ label: 'Отмена' }, { label: 'Сохранить ссылку', primary: true, onClick: submit }] });
   setTimeout(() => urlInput.focus(), 40);
+}
+
+/** Перенести правки из другого проекта CRM или из файла в этот проект — на текущую версию */
+export function openImportNotes(p, v, { onDone } = {}) {
+  if (!can.addVersion(me())) { toast('Правки переносит монтажёр или продюсер'); return; }
+  const dur = x => x?.versions?.[x.versions.length - 1]?.duration || 0;
+  const notesOf = x => (x.notes || []).filter(n => n.kind !== 'approval');
+  const pick = h('div', { style: { display: 'grid', gap: '6px', maxHeight: '280px', overflow: 'auto' } });
+  const status = h('div.hint', { style: { minHeight: '18px' } });
+  let m;
+  const row = (src, users) => {
+    const n = notesOf(src).length, d = dur(src), diff = v.duration && d ? Math.abs(d - v.duration) : 0;
+    const open = notesOf(src).filter(x => !RESOLVED.has(x.status)).length;
+    return h('button.menu-item', { type: 'button', style: { border: '1px solid var(--line)', background: 'var(--surface)', alignItems: 'flex-start' }, onclick: () => run(src, users) },
+      h('span', { html: icon('folder', 16) }),
+      h('span', { style: { display: 'grid', gap: '2px', textAlign: 'left' } },
+        h('b', src.title || 'Без названия'),
+        h('span.muted', { style: { fontSize: '12px' } }, `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'правка' : 'правок'}${open ? `, открытых ${open}` : ''}${d ? ` · видео ${tcShort(d)}` : ''}`),
+        diff > 1 ? h('span', { style: { fontSize: '12px', color: 'var(--danger)' } }, `Длительность отличается на ${tcShort(diff)} — таймкоды могут не совпасть с кадрами`) : null));
+  };
+  const run = (src, users = []) => {
+    const map = authorMapFor(users);
+    const r = importNotes(p, src, v.id, map);
+    m.close();
+    toast(r.added ? `Перенесено правок: ${r.added}` + (r.skipped ? ` · уже были: ${r.skipped}` : '') : 'Новых правок нет — все уже в проекте');
+    onDone?.(r);
+  };
+  const others = projects().filter(x => x.id !== p.id && notesOf(x).length);
+  fill(pick, others.length ? others.map(x => row(x)) : h('p.muted', { style: { fontSize: '13px', margin: 0 } }, 'В CRM нет других проектов с правками — выберите файл.'));
+  const file = h('input.sr', { type: 'file', accept: '.json,application/json', onchange: e => {
+    const f = e.target.files[0]; if (!f) return;
+    f.text().then(t => {
+      const d = readProjectJson(t);
+      if (d.project) return run(d.project, d.users);
+      status.textContent = 'В копии несколько проектов — выберите, откуда перенести правки:';
+      fill(pick, d.projects.filter(x => notesOf(x).length).map(x => row(x, d.users)));
+    }).catch(err => { status.innerHTML = `<span style="color:var(--danger)">${esc(err.message)}</span>`; });
+    e.target.value = '';
+  } });
+  const body = h('div',
+    h('p.muted', { style: { margin: '0 0 12px', fontSize: '13.5px' } }, `Правки лягут на V${v.number}${v.duration ? ` (${tcShort(v.duration)})` : ''} с теми же таймкодами, рисунками и обсуждением. Исходный проект не меняется. Повторный перенос дублей не создаёт.`),
+    h('div.section-t', 'Из проекта в CRM'), pick, status,
+    h('div', { style: { marginTop: '12px' } }, h('label.btn', { html: icon('upload', 16) + 'Из файла JSON' }, file)));
+  m = modal({ title: `Перенести правки в «${p.title}»`, body, actions: [{ label: 'Закрыть' }] });
 }
 
 /** Кто работает в этом браузере: выбор человека и роли */
