@@ -46,7 +46,12 @@ language sql stable security definer set search_path = public as $$
   select role from public.spo_members where user_id = auth.uid()
 $$;
 
--- Вступление в команду: первый вошедший — продюсер, остальные ждут подтверждения
+-- Продюсер (он же админ) — владелец этой почты. Остальные ждут, пока продюсер выдаст роль.
+create or replace function public.spo_admin_email() returns text
+language sql immutable as $$ select 'eijitenshin@gmail.com'::text $$;
+
+-- Вступление в команду. Роль продюсера — только по почте, подтверждённой при входе
+-- (из auth.users или токена), а не по адресу, который прислал браузер.
 create or replace function public.spo_join(p_name text default '', p_email text default '')
 returns public.spo_members
 language plpgsql security definer set search_path = public as $$
@@ -56,30 +61,46 @@ declare
   n int;
 begin
   if auth.uid() is null then raise exception 'Нужно войти'; end if;
-  select * into m from public.spo_members where user_id = auth.uid();
-  if found then return m; end if;
   begin
     select email into v_email from auth.users where id = auth.uid();
   exception when others then v_email := null;
   end;
-  v_email := coalesce(v_email, nullif(trim(p_email), ''));
+  if v_email is null then
+    begin
+      v_email := auth.jwt() ->> 'email';
+    exception when others then v_email := null;
+    end;
+  end if;
+  select * into m from public.spo_members where user_id = auth.uid();
+  if found then
+    -- админ вошёл раньше, чем стал продюсером (например, скрипт обновили) — повышаем
+    if lower(coalesce(v_email, '')) = public.spo_admin_email() and m.role <> 'producer' then
+      perform set_config('spo.join', '1', true);
+      update public.spo_members set role = 'producer' where user_id = auth.uid() returning * into m;
+      perform set_config('spo.join', '', true);
+    end if;
+    return m;
+  end if;
   select count(*) into n from public.spo_members;
   insert into public.spo_members (user_id, email, name, role, color)
   values (
-    auth.uid(), v_email,
-    coalesce(nullif(trim(p_name), ''), split_part(coalesce(v_email, ''), '@', 1)),
-    case when exists (select 1 from public.spo_members where role = 'producer') then 'pending' else 'producer' end,
+    auth.uid(), coalesce(v_email, nullif(trim(p_email), '')),
+    coalesce(nullif(trim(p_name), ''), split_part(coalesce(v_email, p_email, ''), '@', 1)),
+    case when lower(coalesce(v_email, '')) = public.spo_admin_email() then 'producer' else 'pending' end,
     (array['#3546E0','#E5484D','#22A06B','#8E4EC6','#F2711C','#12A5A5','#D6409F'])[1 + n % 7]
   )
   returning * into m;
   return m;
 end $$;
 
--- Роль меняет только продюсер; себе — имя и цвет
+-- Роль меняет только продюсер; себе — имя и цвет. Почту в профиле не меняет никто:
+-- по ней определяется админ. Исключения — функция вступления и SQL-консоль (без входа).
 create or replace function public.spo_members_guard() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  if auth.uid() is null or current_setting('spo.join', true) = '1' then return new; end if;
   if new.user_id is distinct from old.user_id then raise exception 'Нельзя менять пользователя'; end if;
+  if new.email is distinct from old.email then raise exception 'Почту в профиле менять нельзя'; end if;
   if new.role is distinct from old.role and coalesce(public.spo_role(), '') <> 'producer' then
     raise exception 'Роль меняет только продюсер';
   end if;
@@ -139,5 +160,6 @@ grant select, insert, update, delete on public.spo_secrets to authenticated;
 
 revoke all on function public.spo_join(text, text)    from public, anon;
 revoke all on function public.spo_role()              from public, anon;
+revoke all on function public.spo_admin_email()       from anon;
 grant execute on function public.spo_join(text, text) to authenticated;
 grant execute on function public.spo_role()           to authenticated;
