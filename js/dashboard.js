@@ -1,6 +1,6 @@
 import { h, fill, icon, logoSvg, relTime, fmtDate, tcShort, modal, toast, initials } from './util.js';
 import { projects, me, roleName, createProject, STAGES, RESOLVED, labelById, importProjectJson, can } from './store.js';
-import { openIdentity, openAddVersion } from './versions.js';
+import { openIdentity, openAddVersion, openDeleteProject } from './versions.js';
 
 let filter = 'Все', query = '';
 
@@ -22,7 +22,9 @@ export function renderDashboard(root) {
     const gridEl = h('div.grid');
     const drawGrid = () => {
       const vis = list.filter(p => (filter === 'Все' || p.stage === filter) && p.title.toLowerCase().includes(query.toLowerCase()));
-      fill(gridEl, ...vis.map(projectCard), newCard());
+      fill(gridEl, ...vis.map(p => can.manageProject(me())
+        ? h('div.pcard-wrap', projectCard(p), h('button.icon-btn.pcard-del', { title: 'Удалить проект', 'aria-label': `Удалить проект «${p.title}»`, html: icon('trash', 16), onclick: e => { e.preventDefault(); e.stopPropagation(); openDeleteProject(p); } }))
+        : projectCard(p)), newCard());
     };
 
     fill(wrap, 

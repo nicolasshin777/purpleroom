@@ -30,7 +30,7 @@ const frames = (t, fps) => Math.round(t * fps);
 export function exportCsv(ctx) {
   const rows = [['№', 'Версия', 'Начало', 'Конец', 'Ярлыки', 'Приоритет', 'Статус', 'Автор', 'Текст', 'Ответов']];
   for (const n of notesOf(ctx, true)) rows.push([n.seq, 'V' + ctx.ver.number, tc(n.t0, ctx.fps()), n.t1 > n.t0 ? tc(n.t1, ctx.fps()) : '', n.labels.map(l => labelById(l).name).join(', '),
-    PRIORITIES.find(p => p.id === n.priority).name, statusById(n.status).name, userById(n.authorId)?.name || 'Гость', n.text, n.replies.length]);
+    (PRIORITIES.find(p => p.id === n.priority)?.name || ''), statusById(n.status).name, userById(n.authorId)?.name || 'Гость', n.text, n.replies.length]);
   const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
   download(fname(ctx, 'csv'), csv, 'text/csv'); toast('Таблица правок скачана');
 }

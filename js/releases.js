@@ -59,7 +59,9 @@ function renderRelease(root, id) {
     const s = crm(), u = me();
     const proj = s.projects.find(p => p.id === r.projectId);
     const save = (patch, quiet = true) => updateRelease(r, patch, quiet);
-    const title = h('input.title-input', { value: r.title, 'aria-label': 'Название выпуска', oninput: e => save({ title: e.target.value }), onchange: () => save({}, false) });
+    const fit = el => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; };
+    const title = h('textarea.title-input', { rows: 1, 'aria-label': 'Название выпуска', oninput: e => { fit(e.target); save({ title: e.target.value.replace(/\n/g, ' ') }); }, onchange: () => save({}, false), onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } } });
+    title.value = r.title; requestAnimationFrame(() => fit(title));
     const stIdx = REL_STAGES.findIndex(x => x.id === r.stage);
     const tasks = s.tasks.filter(t => t.releaseId === r.id);
     const chapters = proj ? proj.chapters.filter(c => c.versionId === proj.versions[proj.versions.length - 1]?.id).sort((a, b) => a.t - b.t) : [];

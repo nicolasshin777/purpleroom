@@ -8,7 +8,7 @@ import { playableUrl, explainMediaError, registerLocalFile, attachHls } from './
 import { shapeSvg, HATCH_DEF, hitShape, moveShape } from './shapes.js';
 import { mountTimeline } from './timeline.js';
 import { mountPanel } from './panel.js';
-import { openAddVersion, openIdentity, openRelinkVersion, openImportNotes } from './versions.js';
+import { openAddVersion, openIdentity, openRelinkVersion, openImportNotes, openDeleteProject } from './versions.js';
 import { openExportMenu, openCompare } from './export.js';
 
 const TOOLS = [
@@ -104,6 +104,7 @@ export function mountReview(root, project, query = {}) {
       h('button.btn.sm.hide-sm', { onclick: e => openExportMenu(e.currentTarget, ctx), html: icon('download', 16) + 'Экспорт' }),
       h('button.btn.sm.primary', { onclick: openShare, html: icon('share', 16) + '<span class="hide-sm">Поделиться</span>' }),
       h('button.icon-btn.hide-sm', { onclick: openKeys, 'aria-label': 'Горячие клавиши', title: 'Горячие клавиши (?)', html: icon('keyboard') }),
+      can.manageProject(u) ? h('button.icon-btn.hide-sm', { onclick: () => openDeleteProject(ctx.p, { onDone: () => { location.hash = '#/reviews'; } }), 'aria-label': 'Удалить проект', title: 'Удалить проект', html: icon('trash') }) : null,
       h('button.who', { onclick: openIdentity, title: `${u.name} · ${roleName(u.role)} — сменить` }, h('span.avatar', { style: { '--c': u.color } }, initials(u.name)), h('span.r.hide-sm', roleName(u.role))),
     );
   };
@@ -117,7 +118,9 @@ export function mountReview(root, project, query = {}) {
     const { pop } = popover(anchor, [h('div.menu-title', 'Версии ролика'), ...items, h('div.menu-sep'),
       can.addVersion(ctx.u()) && ctx.ver ? h('button.menu-item', { onclick: () => { pop.close(); openRelinkVersion(ctx.p, ctx.ver, { onDone: () => { retried = null; loadVersion(); } }); }, html: icon('link', 16) + (ctx.ver.sourceType === 'file' ? `Ссылка на облако для V${ctx.ver.number}` : `Заменить ссылку V${ctx.ver.number}`) }) : null,
       can.addVersion(ctx.u()) && ctx.ver ? h('button.menu-item', { onclick: () => { pop.close(); openImportNotes(ctx.p, ctx.ver, { onDone: () => ctx.render() }); }, html: icon('download', 16) + `Перенести правки в V${ctx.ver.number}…` }) : null,
-      can.addVersion(ctx.u()) ? h('button.menu-item', { onclick: () => { pop.close(); openAddVersion(ctx.p, { onAdded: v => switchVersion(v.id) }); }, html: icon('plus', 16) + 'Новая версия' }) : h('div.menu-title', 'Версии добавляет монтажёр')]);
+      can.addVersion(ctx.u()) ? h('button.menu-item', { onclick: () => { pop.close(); openAddVersion(ctx.p, { onAdded: v => switchVersion(v.id) }); }, html: icon('plus', 16) + 'Новая версия' }) : h('div.menu-title', 'Версии добавляет монтажёр'),
+      can.manageProject(ctx.u()) ? h('div.menu-sep') : null,
+      can.manageProject(ctx.u()) ? h('button.menu-item', { style: { color: 'var(--danger)' }, onclick: () => { pop.close(); openDeleteProject(ctx.p, { onDone: () => { location.hash = '#/reviews'; } }); }, html: icon('trash', 16) + 'Удалить проект' }) : null]);
   }
 
   function setVersionStatus(s) {

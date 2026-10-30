@@ -108,7 +108,7 @@ export function mountPanel(root, ctx) {
       h('div.row3',
         h('span.who2', h('span.avatar.sm', { style: { '--c': u?.color || '#888' } }, initials(u?.name || 'Г')), u?.name.split(' ')[0] || 'Гость'),
         n.labels.map(l => h('span.chip.lbl.on', { style: { '--c': labelById(l).color, height: '20px', fontSize: '11.5px' } }, h('span.dot'), labelById(l).name)),
-        n.priority !== 'important' ? h('span.prio.' + n.priority, PRIORITIES.find(p => p.id === n.priority).name) : null,
+        n.priority && n.priority !== 'important' && PRIORITIES.some(p => p.id === n.priority) ? h('span.prio.' + n.priority, PRIORITIES.find(p => p.id === n.priority).name) : null,
         h('div', { style: { flex: 1 } }),
         n.replies.length ? h('span.priv', { html: icon('chat', 13) + n.replies.length }) : null,
         statusButton(n)),

@@ -1,8 +1,9 @@
 // Окно «Новая версия»: ссылка с Диска или файл с компьютера.
 import { h, fill, modal, toast, icon, esc } from './util.js';
 import { detectSource, resolveLink, registerLocalFile } from './sources.js';
-import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName, touch, commit, projects, importNotes, readProjectJson, authorMapFor, RESOLVED } from './store.js';
-import { tcShort } from './util.js';
+import { addVersion, me, can, ROLES, addUser, setMe, getState, roleName, touch, commit, projects, importNotes, readProjectJson, authorMapFor, RESOLVED, deleteProject, exportProjectJson } from './store.js';
+import { cloudOn } from './cloud.js';
+import { tcShort, download } from './util.js';
 import * as cloud from './cloud.js';
 
 export function openAddVersion(p, { onAdded } = {}) {
@@ -169,6 +170,23 @@ export function openImportNotes(p, v, { onDone } = {}) {
     h('div.section-t', 'Из проекта в CRM'), pick, status,
     h('div', { style: { marginTop: '12px' } }, h('label.btn', { html: icon('upload', 16) + 'Из файла JSON' }, file)));
   m = modal({ title: `Перенести правки в «${p.title}»`, body, actions: [{ label: 'Закрыть' }] });
+}
+
+/** Удалить проект целиком (только продюсер). Перед удалением — копия в файл одним нажатием. */
+export function openDeleteProject(p, { onDone } = {}) {
+  if (!can.manageProject(me())) { toast('Удалять проекты может только продюсер'); return; }
+  const notes = (p.notes || []).filter(n => n.kind !== 'approval').length, vers = (p.versions || []).length;
+  const save = () => { download(`${(p.title || 'проект').replace(/[\\/:*?"<>|]+/g, ' ').trim()}.spectroptik.json`, exportProjectJson(p), 'application/json'); saved = true; toast('Копия проекта скачана'); };
+  let saved = false;
+  const body = h('div',
+    h('p', { style: { margin: '0 0 10px' } }, `«${p.title}»: ${notes} ${notes % 10 === 1 && notes % 100 !== 11 ? 'правка' : 'правок'}, ${vers} ${vers === 1 ? 'версия' : 'версий'}, главы и чеклист удалятся${cloudOn ? ' у всей команды' : ''}. Отменить это нельзя.`),
+    h('p.muted', { style: { margin: '0 0 10px', fontSize: '13px' } }, 'Видео на Яндекс Диске или Google Диске не трогаются — удаляются только правки и записи CRM.'),
+    h('button.btn', { type: 'button', onclick: save, html: icon('download', 15) + 'Скачать копию проекта' }));
+  modal({ title: 'Удалить проект?', body, actions: [{ label: 'Отмена' }, { label: 'Удалить проект', danger: true, onClick: () => {
+    deleteProject(p.id);
+    toast(`Проект «${p.title}» удалён` + (saved ? ' · копия скачана' : ''));
+    onDone?.();
+  } }] });
 }
 
 /** Кто работает в этом браузере: выбор человека и роли */
