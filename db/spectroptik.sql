@@ -1,10 +1,10 @@
--- СпектрОптик CRM — таблицы в общей базе rusprint.
+-- СпектрОптик CRM — таблицы в базе Data API.
 -- Запускать в SQL-консоли базы ПОСЛЕ включения Data API и Авторизации.
 -- Скрипт можно запускать повторно: он ничего не удаляет и не трогает данные.
 
--- ─── 1. Таблицы типографии закрываем от Data API ───────────────────────────
--- anon и authenticated — роли посетителей сайта в Data API. Сервер rusprint
--- подключается к базе своей ролью, поэтому эти строки его не затрагивают.
+-- ─── 1. Остальные таблицы базы закрываем от Data API ───────────────────────────
+-- anon и authenticated — роли посетителей сайта в Data API. Серверные приложения
+-- подключаются к базе своей ролью, поэтому эти строки их не затрагивают.
 revoke all on all tables    in schema public from anon, authenticated;
 revoke all on all sequences in schema public from anon, authenticated;
 alter default privileges in schema public revoke all on tables    from anon, authenticated;
