@@ -394,9 +394,9 @@ function patchInPlace(target, src) {
 /** Свежий состав команды — при открытии настроек */
 export async function refreshTeam() {
   if (!ready) return;
-  const was = JSON.stringify(members);
-  try { await fetchMembers(); } catch (e) { return; }
-  if (JSON.stringify(members) !== was) { applyUsers(); commit('remote'); }
+  const was = JSON.stringify([members, invites]);
+  try { await fetchMembers(); await loadInvites(); } catch (e) { return; }
+  if (JSON.stringify([members, invites]) !== was) { applyUsers(); commit('remote'); }
 }
 
 export async function setMemberRole(userId, role) {
@@ -404,6 +404,30 @@ export async function setMemberRole(userId, role) {
   if (error) throw error;
   await fetchMembers(); applyUsers(); commit('remote');
 }
+/** Доступы, выданные заранее: почта → роль (видит только продюсер) */
+export let invites = [];
+export async function loadInvites() {
+  if (member?.role !== 'producer') { invites = []; return invites; }
+  const { data, error } = await db.from('spo_invites').select('email,role,created_at').order('created_at');
+  if (error) throw error;
+  invites = data; return invites;
+}
+export async function grantAccess(email, role) {
+  email = email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Похоже, в почте опечатка.');
+  // уже зарегистрировался и ждёт — выдаём роль сразу
+  const m = members.find(x => (x.email || '').toLowerCase() === email);
+  if (m) { await setMemberRole(m.user_id, role); return 'member'; }
+  const { error } = await db.from('spo_invites').upsert({ email, role });
+  if (error) throw error;
+  await loadInvites(); commit('remote'); return 'invite';
+}
+export async function revokeInvite(email) {
+  const { error } = await db.from('spo_invites').delete().eq('email', email);
+  if (error) throw error;
+  await loadInvites(); commit('remote');
+}
+
 export async function removeMember(userId) {
   const { error } = await db.from('spo_members').delete().eq('user_id', userId);
   if (error) throw error;

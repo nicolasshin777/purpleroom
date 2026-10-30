@@ -74,23 +74,43 @@ export function renderSettings(root) {
 
 const isProducer = () => cloud.account()?.role === 'producer';
 
-/** Команда в общей базе: люди регистрируются сами, роль выдаёт продюсер */
+/** Команда в общей базе: продюсер выдаёт доступ по почте; кто зарегистрировался сам — ждёт подтверждения */
 function cloudTeam() {
   const mine = cloud.account(), prod = mine?.role === 'producer';
-  const roles = [...ROLES, { id: 'pending', name: 'Ждёт доступа' }];
+  const roles = [...ROLES.filter(r => r.id !== 'producer'), { id: 'pending', name: 'Без доступа' }];
+  const roleSel = (value, onchange, withPending = true) => h('select.select', { style: { width: '150px', height: '32px' }, 'aria-label': 'Роль', onchange },
+    (withPending ? roles : roles.filter(r => r.id !== 'pending')).map(r => h('option', { value: r.id, selected: value === r.id }, r.name)));
+  const roleText = id => id === 'pending' ? 'Ждёт доступа' : roleName(id);
   const row = m => h('div.row-item',
     h('span.avatar', { style: { '--c': m.color } }, initials(m.name || m.email || '?')),
     h('div', h('div.t', (m.name || m.email) + (m.user_id === mine?.user_id ? ' · вы' : '')), h('div.s', m.email || '')),
-    prod && m.user_id !== mine?.user_id
+    prod && m.user_id !== mine?.user_id && m.role !== 'producer'
       ? h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
-        h('select.select', { style: { width: '150px', height: '32px' }, 'aria-label': 'Роль', onchange: async e => { try { await cloud.setMemberRole(m.user_id, e.target.value); toast('Роль обновлена'); } catch (err) { toast(err.message, 'error'); } } },
-          roles.map(r => h('option', { value: r.id, selected: m.role === r.id }, r.name))),
+        roleSel(m.role, async e => { try { await cloud.setMemberRole(m.user_id, e.target.value); toast(e.target.value === 'pending' ? 'Доступ закрыт' : 'Доступ выдан'); } catch (err) { toast(err.message, 'error'); } }),
         h('button.icon-btn', { title: 'Убрать из команды', 'aria-label': 'Убрать из команды', html: icon('trash', 15), onclick: () => modal({ title: 'Убрать из команды?', body: h('p', `${m.name || m.email} потеряет доступ к CRM. Его правки останутся.`), actions: [{ label: 'Отмена' }, { label: 'Убрать', danger: true, onClick: async () => { try { await cloud.removeMember(m.user_id); } catch (err) { toast(err.message, 'error'); } } }] }) }))
-      : h('span.s', roleName(m.role) === 'pending' ? 'Ждёт доступа' : roles.find(r => r.id === m.role)?.name || m.role));
+      : h('span.s', roleText(m.role)));
   const team = cloud.team(), waiting = team.filter(m => m.role === 'pending');
-  return h('section.panel-box', h('h2', 'Команда', waiting.length && prod ? h('span.side-badge', String(waiting.length)) : null),
-    h('div.rows', team.map(row)),
-    h('p.note-line', { style: { marginTop: '10px' } }, prod
-      ? `Чтобы добавить человека, отправьте ему ссылку на CRM: ${location.origin}. Он зарегистрируется, а вы выдадите роль здесь. Монтажёр отмечает «Исправлено», заказчик принимает правки.`
-      : 'Состав команды и роли меняет продюсер.'));
+  const sorted = [...team.filter(m => m.role === 'pending'), ...team.filter(m => m.role !== 'pending')];
+  const box = h('section.panel-box', h('h2', 'Команда и доступы', waiting.length && prod ? h('span.side-badge', String(waiting.length)) : null));
+  if (!prod) return fill(box, box.firstChild, h('div.rows', sorted.filter(m => m.role !== 'pending').map(row)), h('p.note-line', { style: { marginTop: '10px' } }, 'Доступы выдаёт продюсер.'));
+
+  const email = h('input.input', { type: 'email', placeholder: 'почта человека', autocomplete: 'off', 'aria-label': 'Почта' });
+  let newRole = 'editor';
+  const give = async () => {
+    try { const how = await cloud.grantAccess(email.value, newRole); toast(how === 'member' ? 'Доступ выдан' : 'Доступ выдан — пусть зарегистрируется с этой почтой'); email.value = ''; }
+    catch (err) { toast(err.message, 'error'); email.focus(); }
+  };
+  email.addEventListener('keydown', e => { if (e.key === 'Enter') give(); });
+  const inv = cloud.invites;
+  return fill(box, box.firstChild,
+    h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: '8px', alignItems: 'center' } },
+      email, roleSel(newRole, e => { newRole = e.target.value; }, false), h('button.btn.primary', { onclick: give }, 'Выдать доступ')),
+    h('p.note-line', { style: { margin: '8px 0 6px' } }, `Человек регистрируется на ${location.origin} с этой почтой и сразу попадает в CRM. Монтажёр отмечает «Исправлено», заказчик принимает правки.`),
+    waiting.length ? h('div.section-t', 'Зарегистрировались сами — ждут доступа') : null,
+    h('div.rows', sorted.map(row)),
+    inv.length ? h('div.section-t', { style: { marginTop: '10px' } }, 'Доступ выдан, ещё не зарегистрировались') : null,
+    inv.length ? h('div.rows', inv.map(i => h('div.row-item',
+      h('span.avatar', { style: { '--c': '#85857C' } }, initials(i.email)),
+      h('div', h('div.t', i.email), h('div.s', roleName(i.role))),
+      h('button.icon-btn', { title: 'Отозвать доступ', 'aria-label': 'Отозвать доступ', html: icon('x', 15), onclick: async () => { try { await cloud.revokeInvite(i.email); toast('Доступ отозван'); } catch (err) { toast(err.message, 'error'); } } })))) : null);
 }
