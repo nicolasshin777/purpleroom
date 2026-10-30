@@ -160,6 +160,6 @@ grant select, insert, update, delete on public.spo_secrets to authenticated;
 
 revoke all on function public.spo_join(text, text)    from public, anon;
 revoke all on function public.spo_role()              from public, anon;
-revoke all on function public.spo_admin_email()       from anon;
+revoke all on function public.spo_admin_email()       from public, anon, authenticated, service_role;
 grant execute on function public.spo_join(text, text) to authenticated;
 grant execute on function public.spo_role()           to authenticated;
