@@ -10,6 +10,9 @@ import { h, fill, toast, logoSvg } from './util.js';
 export const cloudOn = !!(CLOUD.url && CLOUD.key);
 const POLL_MS = 15000;
 const BACKUP_KEY = 'spectroptik.v4.before-cloud';
+// у каждой базы — своя сессия и своя копия перед первым входом (переезд на другую базу ничего не теряет)
+const DB_TAG = (CLOUD.url || '').replace(/^https?:\/\//, '').replace(/[^\w.-]+/g, '_');
+const MOVE_KEY = 'spectroptik.v4.before-' + DB_TAG;
 
 let db = null, user = null, member = null, members = [], ready = false;
 let meta = { sent: {}, known: {} };  // sent: id → отпечаток данных, согласованных с сервером; known: id → updated_at
@@ -22,7 +25,7 @@ export const team = () => members;
 async function client() {
   if (db) return db;
   const { createClient } = await import('./vendor/supabase.js');
-  db = createClient(CLOUD.url, CLOUD.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'spectroptik.auth' } });
+  db = createClient(CLOUD.url, CLOUD.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'spectroptik.auth.' + DB_TAG } });
   return db;
 }
 
@@ -162,10 +165,11 @@ function applyUsers() {
 
 async function firstSync() {
   const s = getState();
-  const flag = 'spectroptik.cloud.migrated.' + user.id;
+  const flag = 'spectroptik.cloud.migrated.' + DB_TAG + '.' + user.id;
   if (!localStorage.getItem(flag)) {
     // Копия всего, что было в браузере до общей базы — на всякий случай
     try { if (!localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, JSON.stringify(s)); } catch { }
+    try { if (!localStorage.getItem(MOVE_KEY)) localStorage.setItem(MOVE_KEY, JSON.stringify(s)); } catch { }
     // Кто работал в этом браузере до входа — это вы: правки, выпуски и задачи переходят на ваш аккаунт
     const oldMe = s.meId && s.meId !== user.id ? s.meId : null;
     const others = (s.users || []).filter(u => !u.legacy && u.id !== oldMe && u.id !== user.id);
@@ -191,8 +195,8 @@ function remapUser(s, from, to) {
 
 // ——— Синхронизация ———
 
-function loadMeta() { try { meta = JSON.parse(localStorage.getItem('spectroptik.cloud.' + user.id)) || meta; } catch { } meta.sent ||= {}; meta.known ||= {}; }
-function saveMeta() { try { localStorage.setItem('spectroptik.cloud.' + user.id, JSON.stringify(meta)); } catch { } }
+function loadMeta() { try { meta = JSON.parse(localStorage.getItem('spectroptik.cloud.' + DB_TAG + '.' + user.id)) || meta; } catch { } meta.sent ||= {}; meta.known ||= {}; }
+function saveMeta() { try { localStorage.setItem('spectroptik.cloud.' + DB_TAG + '.' + user.id, JSON.stringify(meta)); } catch { } }
 
 function hash(str) { let x = 5381; for (let i = 0; i < str.length; i++) x = (x * 33 + str.charCodeAt(i)) | 0; return (x >>> 0).toString(36) + ':' + str.length; }
 
