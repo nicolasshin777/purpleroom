@@ -57,22 +57,23 @@ function authScreen(root) {
       pass.autocomplete = mode === 'up' ? 'new-password' : 'current-password';
       fill(form,
         h('div.auth-brand', { html: logoSvg(34) + '<b>СпектрОптик</b><span>CRM</span>' }),
-        h('h1', mode === 'up' ? 'Регистрация' : mode === 'reset' ? 'Новый пароль' : 'Вход'),
-        h('p.auth-sub', mode === 'up' ? 'После регистрации продюсер выдаст вам роль: монтажёр или заказчик.' : mode === 'reset' ? 'Пришлём ссылку для смены пароля.' : 'Проекты, правки и выпуски команды — в одном месте.'),
+        h('h1', mode === 'up' ? 'Регистрация' : mode === 'reset' ? 'Новый пароль' : mode === 'link' ? 'Вход по ссылке' : 'Вход'),
+        h('p.auth-sub', mode === 'up' ? 'После регистрации продюсер выдаст вам роль: монтажёр или заказчик.' : mode === 'reset' ? 'Пришлём ссылку для смены пароля.' : mode === 'link' ? 'Пришлём на почту ссылку — по ней вы войдёте без пароля. Подходит, если вас пригласили в команду.' : 'Проекты, правки и выпуски команды — в одном месте.'),
         mode === 'up' ? h('div.field', h('label', 'Имя'), name) : null,
         h('div.field', h('label', 'Почта'), email),
-        mode !== 'reset' ? h('div.field', h('label', 'Пароль'), pass) : null,
+        mode !== 'reset' && mode !== 'link' ? h('div.field', h('label', 'Пароль'), pass) : null,
         msg,
-        h('button.btn.primary.auth-go', { type: 'submit' }, mode === 'up' ? 'Зарегистрироваться' : mode === 'reset' ? 'Прислать ссылку' : 'Войти'),
+        h('button.btn.primary.auth-go', { type: 'submit' }, mode === 'up' ? 'Зарегистрироваться' : mode === 'reset' || mode === 'link' ? 'Прислать ссылку' : 'Войти'),
         h('div.auth-alt',
           mode !== 'in' ? h('button.btn.ghost.sm', { type: 'button', onclick: () => { mode = 'in'; say(''); draw(); } }, 'У меня есть аккаунт') : h('button.btn.ghost.sm', { type: 'button', onclick: () => { mode = 'up'; say(''); draw(); } }, 'Регистрация'),
+          mode === 'in' ? h('button.btn.ghost.sm', { type: 'button', onclick: () => { mode = 'link'; say(''); draw(); } }, 'Войти по ссылке на почту') : null,
           mode === 'in' ? h('button.btn.ghost.sm', { type: 'button', onclick: () => { mode = 'reset'; say(''); draw(); } }, 'Забыли пароль?') : null),
       );
     };
     const submit = async () => {
       const c = await client(), em = email.value.trim(), pw = pass.value;
       if (!em) return email.focus();
-      if (mode !== 'reset' && pw.length < 8) { say('Пароль — не короче 8 символов.', true); return pass.focus(); }
+      if (mode !== 'reset' && mode !== 'link' && pw.length < 8) { say('Пароль — не короче 8 символов.', true); return pass.focus(); }
       const btn = form.querySelector('.auth-go'); btn.disabled = true; say('Секунду…');
       try {
         const back = location.origin + location.pathname;
@@ -88,9 +89,15 @@ function authScreen(root) {
           say('Готово. Откройте письмо и перейдите по ссылке, чтобы подтвердить почту, затем войдите.');
           mode = 'in'; btn.disabled = false; return;
         }
+        if (mode === 'link') {
+          const { error } = await c.auth.signInWithOtp({ email: em, options: { shouldCreateUser: true, emailRedirectTo: back } });
+          if (error) throw error;
+          say(`Ссылка отправлена на ${em}. Откройте письмо на этом устройстве. Нет письма — загляните в «Спам».`);
+          btn.disabled = false; return;
+        }
         const { error } = await c.auth.resetPasswordForEmail(em, { redirectTo: back });
         if (error) throw error;
-        say('Письмо отправлено. Ссылка из него откроет CRM — пароль можно сменить в настройках.');
+        say('Письмо отправлено. Ссылка из него откроет CRM — пароль можно сменить в окне аккаунта.');
       } catch (e) { say(authError(e), true); }
       btn.disabled = false;
     };
@@ -105,7 +112,7 @@ function authError(e) {
   if (/invalid login|invalid_credentials/i.test(m)) return 'Неверная почта или пароль.';
   if (/not confirmed/i.test(m)) return 'Почта ещё не подтверждена — перейдите по ссылке из письма.';
   if (/already registered|already exists/i.test(m)) return 'Такая почта уже зарегистрирована — войдите.';
-  if (/rate limit|too many/i.test(m)) return 'Слишком много попыток. Подождите минуту.';
+  if (/rate limit|too many|security purposes/i.test(m)) return 'Слишком много попыток. Подождите минуту.';
   if (/failed to fetch|network/i.test(m)) return 'Нет связи с сервером. Проверьте интернет.';
   return m;
 }
@@ -431,7 +438,23 @@ export async function grantAccess(email, role) {
   if (m) { await setMemberRole(m.user_id, role); return 'member'; }
   const { error } = await db.from('spo_invites').upsert({ email, role });
   if (error) throw error;
-  await loadInvites(); commit('remote'); return 'invite';
+  await loadInvites(); commit('remote');
+  await sendInvite(email);   // доступ уже выдан; если письмо не ушло — ошибка с понятной причиной
+  return 'invite';
+}
+
+/**
+ * Письмо-приглашение: ссылка для входа без пароля. По ней человек попадает в CRM,
+ * а роль ему даёт выданный доступ. Отправляется с этой страницы, вход продюсера не меняется.
+ */
+export async function sendInvite(email) {
+  const { error } = await db.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
+  if (error) {
+    const m = authError(error);
+    throw new Error(/подождите|rate|too many|security purposes/i.test(String(error.message || m))
+      ? `Доступ выдан, но письмо пока не отправлено: почта ограничивает частоту писем. Нажмите «Отправить ещё раз» через минуту.`
+      : `Доступ выдан, но письмо не отправлено: ${m}`);
+  }
 }
 export async function revokeInvite(email) {
   const { error } = await db.from('spo_invites').delete().eq('email', email);

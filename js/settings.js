@@ -102,7 +102,8 @@ function cloudTeam() {
   const email = h('input.input', { type: 'email', placeholder: 'почта человека', autocomplete: 'off', 'aria-label': 'Почта' });
   let newRole = 'editor';
   const give = async () => {
-    try { const how = await cloud.grantAccess(email.value, newRole); toast(how === 'member' ? 'Доступ выдан' : 'Доступ выдан — пусть зарегистрируется с этой почтой'); email.value = ''; }
+    const addr = email.value.trim();
+    try { const how = await cloud.grantAccess(addr, newRole); toast(how === 'member' ? 'Доступ выдан' : `Приглашение отправлено на ${addr}`); email.value = ''; }
     catch (err) { toast(err.message, 'error'); email.focus(); }
   };
   email.addEventListener('keydown', e => { if (e.key === 'Enter') give(); });
@@ -110,12 +111,14 @@ function cloudTeam() {
   return fill(box, box.firstChild,
     h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: '8px', alignItems: 'center' } },
       email, roleSel(newRole, e => { newRole = e.target.value; }, false), h('button.btn.primary', { onclick: give }, 'Выдать доступ')),
-    h('p.note-line', { style: { margin: '8px 0 6px' } }, `Человек регистрируется на ${location.origin} с этой почтой и сразу попадает в CRM. Монтажёр отмечает «Исправлено», заказчик принимает правки.`),
+    h('p.note-line', { style: { margin: '8px 0 6px' } }, 'На почту придёт письмо от «СпектрОптик» со ссылкой: по ней человек сразу попадает в CRM со своей ролью, без регистрации. Письма нет — пусть проверит «Спам». Монтажёр отмечает «Исправлено», заказчик принимает правки.'),
     waiting.length ? h('div.section-t', 'Зарегистрировались сами — ждут доступа') : null,
     h('div.rows', sorted.map(row)),
-    inv.length ? h('div.section-t', { style: { marginTop: '10px' } }, 'Доступ выдан, ещё не зарегистрировались') : null,
+    inv.length ? h('div.section-t', { style: { marginTop: '10px' } }, 'Приглашены, ещё не заходили') : null,
     inv.length ? h('div.rows', inv.map(i => h('div.row-item',
       h('span.avatar', { style: { '--c': '#85857C' } }, initials(i.email)),
       h('div', h('div.t', i.email), h('div.s', roleName(i.role))),
-      h('button.icon-btn', { title: 'Отозвать доступ', 'aria-label': 'Отозвать доступ', html: icon('x', 15), onclick: async () => { try { await cloud.revokeInvite(i.email); toast('Доступ отозван'); } catch (err) { toast(err.message, 'error'); } } })))) : null);
+      h('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } },
+        h('button.btn.sm', { title: 'Отправить письмо со ссылкой ещё раз', onclick: async e => { const b = e.currentTarget; b.disabled = true; try { await cloud.sendInvite(i.email); toast(`Письмо отправлено на ${i.email}`); } catch (err) { toast(err.message.replace('Доступ выдан, но п', 'П'), 'error'); } b.disabled = false; } }, 'Отправить ещё раз'),
+      h('button.icon-btn', { title: 'Отозвать доступ', 'aria-label': 'Отозвать доступ', html: icon('x', 15), onclick: async () => { try { await cloud.revokeInvite(i.email); toast('Доступ отозван'); } catch (err) { toast(err.message, 'error'); } } }))))) : null);
 }
